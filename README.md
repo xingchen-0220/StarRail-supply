@@ -1,5 +1,7 @@
 ﻿# starrail-supply · 星穹签到助手
-![Uploading 1793468623176.gif…]()
+<img width="800" height="450" alt="1793468623176" src="https://github.com/user-attachments/assets/03f84203-dd0b-4b12-837c-947ce8e0a412" />
+
+
 
 《崩坏：星穹铁道》列车补给自动领取工具。
 
