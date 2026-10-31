@@ -20,6 +20,7 @@ from .overlay import StatusOverlay
 from .signin import SigninRunner
 
 TASK_NAME = "星穹签到助手-每日签到"
+GITHUB_URL = "https://github.com/xingchen-0220/StarRail-supply"
 BG = "#f6f7fb"
 SIDEBAR = "#0f172a"
 SIDEBAR_ACTIVE = "#1e3a8a"
@@ -463,6 +464,13 @@ class App:
                            lambda: webbrowser.open("https://space.bilibili.com/1321645331")).pack(
             side="left", padx=12
         )
+
+        repo_row = tk.Frame(left, bg="white")
+        repo_row.pack(anchor="w", pady=(8, 0))
+        tk.Label(repo_row, text="GitHub：xingchen-0220/StarRail-supply", bg="white", fg=TEXT,
+                 font=("Microsoft YaHei UI", 10)).pack(side="left")
+        self._light_button(repo_row, "打开仓库",
+                           lambda: webbrowser.open(GITHUB_URL)).pack(side="left", padx=12)
 
         tk.Label(left, text=f"{APP_NAME}  v{APP_VERSION}", bg="white", fg="#94a3b8",
                  font=("Microsoft YaHei UI", 8)).pack(anchor="w", pady=(18, 0))

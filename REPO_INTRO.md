@@ -1,6 +1,8 @@
 # starrail-supply · 星穹签到助手
 
 > 不开浏览器，直接启动《崩坏：星穹铁道》，识别并领取「列车补给」的 Windows 小工具。
+>
+> 仓库地址：<https://github.com/xingchen-0220/StarRail-supply>
 
 `starrail-supply` 是一个基于**图像识别 + 模拟鼠标点击**的星铁每日补给领取工具。
 它不读取游戏内存、不修改游戏文件、不处理账号密码，只做一件事：
@@ -145,7 +147,7 @@ starrail-supply/
 环境：Windows 10/11、Python 3.12。
 
 ```bat
-git clone https://github.com/你的用户名/starrail-supply.git
+git clone https://github.com/xingchen-0220/StarRail-supply.git
 cd starrail-supply
 python -m pip install -r requirements.txt
 python main.py
@@ -227,3 +229,5 @@ python tools\selftest_flow.py
 - 界面：Python tkinter
 
 请遵守游戏用户协议，使用脚本的风险由使用者自行承担。
+
+

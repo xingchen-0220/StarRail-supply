@@ -1,8 +1,8 @@
-# starrail-supply · 星穹签到助手
+﻿# starrail-supply · 星穹签到助手
 
 《崩坏：星穹铁道》列车补给自动领取工具。
 
-> 仓库名：`starrail-supply` ｜ 完整的仓库介绍、架构与开发说明见 [REPO_INTRO.md](REPO_INTRO.md)。
+> 仓库名：`starrail-supply` ｜ 仓库地址：<https://github.com/xingchen-0220/StarRail-supply> ｜ 完整介绍见 [REPO_INTRO.md](REPO_INTRO.md)。
 
 基于**图像识别（OCR + 模板/文字定位 + 模拟鼠标点击）**，从开源项目
 [March7thAssistant](https://github.com/moesnow/March7thAssistant) 中提取游戏启动与识别点击能力，
@@ -49,7 +49,7 @@
 环境：Windows 10/11、Python 3.12。
 
 ```bat
-git clone https://github.com/你的用户名/starrail-supply.git
+git clone https://github.com/xingchen-0220/StarRail-supply.git
 cd starrail-supply
 python -m pip install -r requirements.txt
 python main.py
@@ -125,3 +125,5 @@ starrail-supply/
 - 界面：Python tkinter
 
 请遵守游戏用户协议，使用脚本的风险由使用者自行承担。
+
+

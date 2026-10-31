@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 APP_NAME = "星穹签到助手"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 
 
 def is_frozen() -> bool:
@@ -95,5 +95,6 @@ class Config:
 
 
 cfg = Config()
+
 
 

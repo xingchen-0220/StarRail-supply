@@ -26,13 +26,16 @@ daily-reward
 不开浏览器，直接启动《崩坏：星穹铁道》，自动识别并点击「点击进入」和「点击领取今日补给」，
 领完自动关游戏。支持每天定时、Windows 计划任务，OCR 本地离线识别。
 只做截图识别 + 模拟点击，不读内存、不改游戏文件。
-项目开源在 GitHub：starrail-supply
+项目开源在 GitHub：https://github.com/xingchen-0220/StarRail-supply
 作者：梦和星辰  B站UID：1321645331
 
 【仓库第一篇 Release 简介】
-v1.3.0
+v1.3.1
 - 左侧导航界面：首页 / 定时签到 / 运行日志 / 设置 / 关于
+- 关于页增加 GitHub 仓库入口（xingchen-0220/StarRail-supply）
 - 一键启动游戏并领取列车补给
 - 左下角 7 步实时浮窗
 - 支持程序内定时与 Windows 计划任务（自动互斥）
 - 内置 OCR 模型，离线可用，需管理员权限
+
+
