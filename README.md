@@ -11,7 +11,8 @@
 启动游戏 → 识别「点击进入」→ 识别「点击领取今日补给 / 今日奖励」→ 点击领取 → 关闭游戏，
 并支持每天定时自动执行。
 
-![首页](docs/screenshot.png)
+
+
 
 ## 功能
 
@@ -23,9 +24,7 @@
   - 两者互斥，创建计划任务后会自动关闭程序内定时，避免重复领取。
 - **游戏路径自动检测**：支持注册表与常见安装目录，也可以手动选择 `StarRail.exe`。
 - **运行日志**：实时日志与失败截图，方便排查识别问题。
-- **现代化界面**：左侧导航（首页 / 定时签到 / 运行日志 / 设置 / 关于），深色侧栏 + 卡片式内容。
 
-![关于](docs/about.png)
 
 ## 下载与使用
 
@@ -112,7 +111,8 @@ starrail-supply/
 - B站UID：1321645331
 - B站主页：<https://space.bilibili.com/1321645331>
 
-<img src="assets/reward_qr.png" width="300" alt="赞赏码">
+<img width="1139" height="1139" alt="reward_qr" src="https://github.com/user-attachments/assets/74b904c4-d395-48c4-8460-94a5eb6982c3" />
+
 
 ## 开源协议与致谢
 
