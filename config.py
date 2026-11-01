@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 APP_NAME = "星穹签到助手"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.5.1"
 
 
 def is_frozen() -> bool:
@@ -53,6 +53,15 @@ DEFAULTS = {
     "schedule_time": "08:00",
     "schedule_days": [1, 2, 3, 4, 5, 6, 7],
     "last_run": "",
+    "daily_enabled": False,
+    "daily_clear_power": True,
+    "notify_enabled": False,
+    "onebot_url": "http://127.0.0.1:3000",
+    "onebot_token": "",
+    "qq_target": "",
+    "send_screenshots": True,
+    "check_update_on_start": True,
+    "skipped_version": "",
 }
 
 
@@ -95,6 +104,17 @@ class Config:
 
 
 cfg = Config()
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -16,6 +16,7 @@ from PIL import Image, ImageTk
 from . import launcher, winapi
 from .config import APP_NAME, APP_VERSION, DATA_DIR, RESOURCE, cfg, ensure_dirs, is_frozen
 from .logger import AppLog
+from .notifier import OneBotNotifier
 from .overlay import StatusOverlay
 from .signin import SigninRunner
 
@@ -34,6 +35,8 @@ FONT = ("Microsoft YaHei UI", 10)
 class App:
     PAGES = {
         "home": ("首页", "启动游戏 · 识别点击 · 领取每日奖励"),
+        "daily": ("日常任务", "内置日常：邮件 / 委托 / 清体力 / 支援 / 每日实训 500"),
+        "notify": ("QQ 通知", "OneBot v11 私聊通知，发送签到/日常结果与截图"),
         "schedule": ("定时签到", "每天固定时间自动领取，可选程序内定时或 Windows 计划任务"),
         "log": ("运行日志", "实时查看签到过程与错误信息"),
         "settings": ("设置", "游戏路径、窗口与识别参数"),
@@ -54,7 +57,10 @@ class App:
         self.stop_event = None
         self.last_ok = False
         self.last_skipped = False
+        self.last_signin_ok = False
+        self.last_daily_ok = None
         self.plan_task_exists = False
+        self.update_checking = False
         self.pages = {}
         self.nav_buttons = {}
         self.current_page = "home"
@@ -82,6 +88,8 @@ class App:
         self.root.after(100, self._poll)
         self.root.after(600, self._tick_schedule)
         self.root.after(1500, self.refresh_status)
+        if cfg.get("check_update_on_start", True):
+            self.root.after(2500, lambda: self.check_updates(False))
 
     # ------------------------------------------------------------- 外观 --
     def _style(self):
@@ -135,6 +143,8 @@ class App:
 
         items = [
             ("home", "首页"),
+            ("daily", "日常任务"),
+            ("notify", "QQ 通知"),
             ("schedule", "定时签到"),
             ("log", "运行日志"),
             ("settings", "设置"),
@@ -240,6 +250,8 @@ class App:
 
     def _build_pages(self):
         self._build_home(self._new_page("home"))
+        self._build_daily(self._new_page("daily"))
+        self._build_notify(self._new_page("notify"))
         self._build_schedule(self._new_page("schedule"))
         self._build_log(self._new_page("log"))
         self._build_settings(self._new_page("settings"))
@@ -332,6 +344,96 @@ class App:
                                      insertbackground="white")
         self.home_log_text.pack(fill="both", expand=True, pady=(8, 0))
         self.home_log_text.configure(state="disabled")
+
+    def _build_daily(self, page):
+        wrap = tk.Frame(page, bg=BG)
+        wrap.pack(fill="both", expand=True, padx=24, pady=20)
+        card, inner = self._card(wrap, padx=22, pady=18)
+        card.pack(fill="x")
+        self._section_title(inner, "日常任务", "邮件 / 委托 / 清体力 / 支援 / 无名勋礼 / 每日实训 500")
+
+        self.daily_enabled_var = tk.BooleanVar(value=bool(cfg.get("daily_enabled", False)))
+        tk.Checkbutton(inner, text="签到成功后执行日常任务", variable=self.daily_enabled_var,
+                       command=self.save_daily_settings, bg="white", activebackground="white",
+                       selectcolor="white", fg=TEXT,
+                       font=("Microsoft YaHei UI", 10)).pack(anchor="w", pady=(14, 8))
+
+        self.clear_power_var = tk.BooleanVar(value=bool(cfg.get("daily_clear_power", False)))
+        tk.Checkbutton(inner, text="清空剩余开拓力（按当前体力设置花萼挑战次数，最多 24 次）",
+                       variable=self.clear_power_var, command=self.save_daily_settings,
+                       bg="white", activebackground="white", selectcolor="white", fg=TEXT,
+                       font=("Microsoft YaHei UI", 9)).pack(anchor="w", pady=(2, 8))
+
+        self._accent_button(inner, "保存日常设置", self.save_daily_settings).pack(
+            anchor="e", pady=(12, 0))
+
+        note, note_inner = self._card(wrap, padx=20, pady=14)
+        note.pack(fill="x", pady=(14, 0))
+        tk.Label(note_inner, text="说明", bg="white", fg=TEXT,
+                 font=("Microsoft YaHei UI", 10, "bold")).pack(anchor="w")
+        for text in (
+            "· 内置日常：邮件、委托、清空剩余开拓力花萼、支援战斗、支援奖励、无名勋礼、每日实训 500。",
+            "· 不需要安装任何外部程序；模拟宇宙、差分宇宙、货币战争、历战余响不在内置范围内。",
+            "· 日常结束后，本程序会按「签到后关闭游戏」选项决定是否关闭游戏。",
+        ):
+            tk.Label(note_inner, text=text, bg="white", fg=MUTED,
+                     font=("Microsoft YaHei UI", 9), anchor="w", justify="left").pack(
+                fill="x", pady=2)
+
+    def _build_notify(self, page):
+        wrap = tk.Frame(page, bg=BG)
+        wrap.pack(fill="both", expand=True, padx=24, pady=20)
+        card, inner = self._card(wrap, padx=22, pady=18)
+        card.pack(fill="x")
+        self._section_title(inner, "QQ 通知", "OneBot v11 私聊通知：先发文字，再发截图")
+
+        self.notify_enabled_var = tk.BooleanVar(value=bool(cfg.get("notify_enabled", False)))
+        tk.Checkbutton(inner, text="启用 QQ 通知", variable=self.notify_enabled_var,
+                       command=self.save_notify_settings, bg="white", activebackground="white",
+                       selectcolor="white", fg=TEXT,
+                       font=("Microsoft YaHei UI", 10)).pack(anchor="w", pady=(14, 8))
+
+        fields = tk.Frame(inner, bg="white")
+        fields.pack(fill="x")
+        self.onebot_url_var = tk.StringVar(value=cfg.get("onebot_url", "http://127.0.0.1:3000"))
+        self.onebot_token_var = tk.StringVar(value=cfg.get("onebot_token", ""))
+        self.qq_target_var = tk.StringVar(value=cfg.get("qq_target", ""))
+        self.send_shots_var = tk.BooleanVar(value=bool(cfg.get("send_screenshots", True)))
+        self._field(fields, "OneBot API", self.onebot_url_var, 0)
+        self._field(fields, "Access Token", self.onebot_token_var, 1, show="*")
+        self._field(fields, "目标 QQ 号", self.qq_target_var, 2)
+        tk.Checkbutton(fields, text="发送截图（签到成功/未弹窗/失败、日常结束）",
+                       variable=self.send_shots_var, bg="white", activebackground="white",
+                       selectcolor="white", fg=TEXT,
+                       font=("Microsoft YaHei UI", 9)).grid(
+            row=3, column=1, sticky="w", pady=6, padx=8)
+
+        buttons = tk.Frame(inner, bg="white")
+        buttons.pack(fill="x", pady=(10, 0))
+        self._accent_button(buttons, "保存通知设置", self.save_notify_settings).pack(side="right")
+        self._light_button(buttons, "发送测试消息", self.test_notify).pack(side="right", padx=8)
+
+        note, note_inner = self._card(wrap, padx=20, pady=14)
+        note.pack(fill="x", pady=(14, 0))
+        tk.Label(note_inner, text="说明", bg="white", fg=TEXT,
+                 font=("Microsoft YaHei UI", 10, "bold")).pack(anchor="w")
+        for text in (
+            "· 支持 NapCat / go-cqhttp / LLOneBot 等 OneBot v11 HTTP 接口。",
+            "· 默认地址 http://127.0.0.1:3000；如果机器人设置了 token，请一并填写。",
+            "· 目标 QQ 号填你自己的 QQ，机器人会以私聊方式发送文字和图片。",
+        ):
+            tk.Label(note_inner, text=text, bg="white", fg=MUTED,
+                     font=("Microsoft YaHei UI", 9), anchor="w", justify="left").pack(
+                fill="x", pady=2)
+
+    def _field(self, parent, label, var, row, show=None):
+        tk.Label(parent, text=label, bg="white", fg=MUTED, font=("Microsoft YaHei UI", 9),
+                 width=14, anchor="e").grid(row=row, column=0, sticky="e", pady=5, padx=(0, 8))
+        entry = tk.Entry(parent, textvariable=var, bg="#f8fafc", relief="flat",
+                         highlightthickness=1, highlightbackground=BORDER, font=FONT,
+                         show=show or "")
+        entry.grid(row=row, column=1, sticky="we", pady=5, padx=(0, 8), ipady=4)
+        parent.grid_columnconfigure(1, weight=1)
 
     def _build_schedule(self, page):
         wrap = tk.Frame(page, bg=BG)
@@ -427,6 +529,10 @@ class App:
         tk.Checkbutton(row, text="操作前自动切换到游戏窗口", variable=self.bring_front_var,
                        bg="white", activebackground="white", selectcolor="white",
                        fg=TEXT, font=("Microsoft YaHei UI", 9)).pack(side="left")
+        self.update_check_var = tk.BooleanVar(value=bool(cfg.get("check_update_on_start", True)))
+        tk.Checkbutton(row, text="启动时检查 GitHub 更新", variable=self.update_check_var,
+                       bg="white", activebackground="white", selectcolor="white",
+                       fg=TEXT, font=("Microsoft YaHei UI", 9)).pack(side="left", padx=16)
         self._accent_button(row, "保存设置", self.save_settings).pack(side="right")
 
         data_card, data_inner = self._card(wrap, padx=22, pady=16)
@@ -472,8 +578,12 @@ class App:
         self._light_button(repo_row, "打开仓库",
                            lambda: webbrowser.open(GITHUB_URL)).pack(side="left", padx=12)
 
-        tk.Label(left, text=f"{APP_NAME}  v{APP_VERSION}", bg="white", fg="#94a3b8",
-                 font=("Microsoft YaHei UI", 8)).pack(anchor="w", pady=(18, 0))
+        version_row = tk.Frame(left, bg="white")
+        version_row.pack(anchor="w", pady=(18, 0))
+        tk.Label(version_row, text=f"{APP_NAME}  v{APP_VERSION}", bg="white", fg="#94a3b8",
+                 font=("Microsoft YaHei UI", 8)).pack(side="left")
+        self._light_button(version_row, "检查更新",
+                           lambda: self.check_updates(True)).pack(side="left", padx=10)
 
         qr_card, qr = self._card(wrap, padx=20, pady=18)
         qr_card.grid(row=0, column=1, sticky="n")
@@ -505,6 +615,8 @@ class App:
                     self.overlay.update_step(index, total, text)
                 elif kind == "done":
                     self._signin_done()
+                elif kind == "update":
+                    self._on_update_result(*value)
         except queue.Empty:
             pass
         self.root.after(120, self._poll)
@@ -540,6 +652,46 @@ class App:
 
     def open_log(self):
         os.startfile(str(self.logger.path))
+
+    def check_updates(self, manual=False):
+        if self.update_checking:
+            return
+        self.update_checking = True
+        if manual:
+            self.log("正在检查 GitHub 更新…")
+
+        def job():
+            from .updater import check_for_update
+
+            try:
+                info = check_for_update(APP_VERSION)
+                error = ""
+            except Exception as exc:
+                info = None
+                error = str(exc)
+            self.messages.put(("update", (info, error, manual)))
+
+        threading.Thread(target=job, daemon=True).start()
+
+    def _on_update_result(self, info, error, manual):
+        self.update_checking = False
+        if error:
+            self.log(f"检查更新失败：{error}")
+            if manual:
+                messagebox.showwarning(
+                    "检查更新失败",
+                    "无法连接 GitHub。\n请检查网络后重试。\n\n" + error[:300],
+                )
+            return
+        if not info or not info.get("is_new"):
+            if manual:
+                messagebox.showinfo("检查更新", f"当前已是最新版本 v{APP_VERSION}")
+            return
+        if not manual and cfg.get("skipped_version") == info["latest"]:
+            self.log(f"已跳过版本 v{info['latest']}")
+            return
+        self.log(f"发现新版本：v{info['latest']}（当前 v{APP_VERSION}）")
+        UpdateDialog(self, info)
 
 
 # ------------------------------------------------------------ 配置 --
@@ -589,6 +741,40 @@ class App:
         self.schedule_var.set(bool(cfg.get("schedule_enabled", False)))
         self.save_schedule()
 
+    def save_daily_settings(self, verbose=True):
+        cfg.set("daily_enabled", bool(self.daily_enabled_var.get()))
+        cfg.set("daily_clear_power", bool(self.clear_power_var.get()))
+        cfg.save()
+        if verbose:
+            self.log("日常设置已保存")
+
+    def save_notify_settings(self, verbose=True):
+        target = self.qq_target_var.get().strip()
+        if target and not target.isdigit():
+            if verbose:
+                messagebox.showwarning("QQ 号格式错误", "目标 QQ 号只能填写数字")
+            return
+        cfg.set("notify_enabled", bool(self.notify_enabled_var.get()))
+        cfg.set("onebot_url", self.onebot_url_var.get().strip() or "http://127.0.0.1:3000")
+        cfg.set("onebot_token", self.onebot_token_var.get().strip())
+        cfg.set("qq_target", target)
+        cfg.set("send_screenshots", bool(self.send_shots_var.get()))
+        cfg.save()
+        if verbose:
+            self.log("QQ 通知设置已保存")
+
+    def test_notify(self):
+        self.save_notify_settings(verbose=False)
+        self.log("正在发送 QQ 测试消息…")
+
+        def job():
+            from .notifier import OneBotNotifier
+
+            ok = OneBotNotifier(cfg, self.log).send_test()
+            self.log("QQ 测试消息发送成功" if ok else "QQ 测试消息发送失败，请检查 API 地址/Token/QQ 号")
+
+        threading.Thread(target=job, daemon=True).start()
+
     def save_settings(self):
         numeric_float = {"click_delay", "ocr_confidence"}
         numeric_int = {"launch_timeout", "title_timeout", "reward_timeout"}
@@ -605,6 +791,7 @@ class App:
             cfg.set(key, value)
         cfg.set("game_path", self.path_var.get().strip())
         cfg.set("bring_to_front", bool(self.bring_front_var.get()))
+        cfg.set("check_update_on_start", bool(self.update_check_var.get()))
         cfg.save()
         self.log("设置已保存")
         self.refresh_status()
@@ -669,6 +856,8 @@ class App:
             else:
                 messagebox.showwarning("提示", "请先选择 StarRail.exe 的路径")
                 return
+        self.save_daily_settings(verbose=False)
+        self.save_notify_settings(verbose=False)
         cfg.save()
 
         if not is_admin():
@@ -691,7 +880,9 @@ class App:
             ok = False
             skipped = False
             try:
-                runner = SigninRunner(
+                from .flow import FullFlow
+
+                flow = FullFlow(
                     cfg, self.log, stop_event=self.stop_event,
                     on_step=lambda text: self.messages.put(("status", text)),
                     on_progress=lambda index, total, text: self.messages.put(
@@ -699,12 +890,14 @@ class App:
                     ),
                     mask_provider=lambda: self.overlay.rect(),
                 )
-                ok = runner.run()
-                skipped = runner.skipped
+                ok = flow.run()
+                skipped = flow.skipped
+                self.last_signin_ok = flow.signin_ok
+                self.last_daily_ok = flow.daily_ok
             except Exception as exc:
                 import traceback
 
-                self.log(f"签到异常：{exc}")
+                self.log(f"流程异常：{exc}")
                 self.log(traceback.format_exc())
             self.last_ok = bool(ok)
             self.last_skipped = bool(skipped)
@@ -722,16 +915,27 @@ class App:
         except Exception:
             pass
         if self.last_skipped:
-
             self.status_var.set("另一个签到任务正在运行，本窗口未重复执行")
             self.overlay.finish("已有签到任务在运行", ok=None, hide_after=5000)
             self.log("—— 已有签到任务在运行，本次跳过 ——")
             return
+        if self.last_signin_ok and self.last_daily_ok is False:
+            self.status_var.set("签到成功，日常执行失败，请查看日志")
+            self.log("—— 签到成功，日常执行失败 ——")
+            self.overlay.finish("签到成功，日常失败", ok=False, hide_after=8000)
+            return
+        if not self.last_signin_ok and self.last_daily_ok:
+            self.status_var.set("签到失败，日常已完成")
+            self.log("—— 签到失败，日常完成 ——")
+            self.overlay.finish("签到失败，日常完成", ok=None, hide_after=8000)
+            if cfg.get("exit_app", True):
+                self._countdown_exit(5)
+            return
         if self.last_ok:
-
-            self.status_var.set("签到完成")
-            self.log("—— 签到成功 ——")
-            self.overlay.finish("签到完成", ok=True)
+            done_text = "签到与日常完成" if self.last_daily_ok else "签到完成"
+            self.status_var.set(done_text)
+            self.log("—— " + done_text + " ——")
+            self.overlay.finish(done_text, ok=True)
             if cfg.get("exit_app", True):
                 self._countdown_exit(5)
         else:
@@ -935,6 +1139,65 @@ def days_text(days):
     return "、".join(DAY_LABELS[day - 1] for day in days)
 
 
+class UpdateDialog(tk.Toplevel):
+    """发现新版本时的弹窗。"""
+
+    def __init__(self, app, info):
+        super().__init__(app.root)
+        self.app = app
+        self.info = info
+        self.title("发现新版本")
+        self.configure(bg=BG)
+        self.resizable(False, False)
+        self.transient(app.root)
+        self.grab_set()
+        self.geometry("+%d+%d" % (app.root.winfo_rootx() + 160, app.root.winfo_rooty() + 90))
+
+        body = ttk.Frame(self, padding=(20, 16, 20, 12))
+        body.pack(fill="both", expand=True)
+        tk.Label(body, text=f"发现新版本 v{info['latest']}", bg=BG, fg=TEXT,
+                 font=("Microsoft YaHei UI", 16, "bold")).pack(anchor="w")
+        tk.Label(body,
+                 text=f"当前版本 v{info['current']}  →  最新版本 v{info['latest']}（{info.get('source', 'GitHub')}）",
+                 bg=BG, fg=MUTED, font=("Microsoft YaHei UI", 9)).pack(anchor="w", pady=(4, 12))
+
+        tk.Label(body, text="更新内容", bg=BG, fg=TEXT,
+                 font=("Microsoft YaHei UI", 10, "bold")).pack(anchor="w")
+        notes = tk.Text(body, width=72, height=14, bg="#111318", fg="#d7dce8",
+                        relief="flat", font=("Microsoft YaHei UI", 9), padx=10, pady=8)
+        notes.pack(fill="both", expand=True, pady=(6, 10))
+        notes.insert("1.0", str(info.get("notes") or "（该版本没有填写更新说明）"))
+        notes.configure(state="disabled")
+
+        self.skip_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(body, text=f"跳过此版本（v{info['latest']}）", variable=self.skip_var,
+                       bg=BG, activebackground=BG, selectcolor="white", fg=TEXT,
+                       font=("Microsoft YaHei UI", 9)).pack(anchor="w")
+
+        buttons = ttk.Frame(body)
+        buttons.pack(fill="x", pady=(12, 0))
+        ttk.Button(buttons, text="稍后", command=self.close).pack(side="right", padx=6)
+        ttk.Button(buttons, text="打开 Release 页面",
+                   command=lambda: webbrowser.open(info.get("url") or GITHUB_URL)).pack(
+            side="right", padx=6)
+        ttk.Button(buttons, text="前往下载", style="Accent.TButton",
+                   command=self.download).pack(side="right", padx=6)
+
+        self.protocol("WM_DELETE_WINDOW", self.close)
+
+    def download(self):
+        url = self.info.get("download") or self.info.get("url") or GITHUB_URL
+        webbrowser.open(url)
+        self.close()
+
+    def close(self):
+        if self.skip_var.get():
+            cfg.set("skipped_version", self.info["latest"])
+            cfg.save()
+            self.app.log(f"已跳过版本 v{self.info['latest']}")
+        self.destroy()
+
+
 class ScheduleDialog(tk.Toplevel):
     """图形化定时设置：时间 + 星期。"""
 
@@ -1042,7 +1305,7 @@ def is_admin():
 
 
 def run_auto_with_overlay(log):
-    """无主界面执行签到，只显示左下角步骤浮窗（计划任务用）。"""
+    """无主界面执行完整流程，只显示左下角步骤浮窗（计划任务用）。"""
     from .config import cfg as app_cfg
 
     root = tk.Tk()
@@ -1050,7 +1313,7 @@ def run_auto_with_overlay(log):
     overlay = StatusOverlay(root)
     overlay.show("准备启动游戏…")
     progress_queue = queue.Queue()
-    result = {"ok": False, "done": False, "finished": False}
+    result = {"ok": False, "signin_ok": False, "daily_ok": None, "done": False, "finished": False}
 
     def poll():
         try:
@@ -1065,20 +1328,32 @@ def run_auto_with_overlay(log):
         root.after(120, poll)
 
     def finish():
-        ok = result["ok"]
-        overlay.finish("签到完成" if ok else "签到失败", ok=ok)
+        if result["signin_ok"] and result["daily_ok"]:
+            overlay.finish("签到与日常完成", ok=True)
+        elif result["daily_ok"]:
+            overlay.finish("签到失败，日常完成", ok=None)
+        elif result["signin_ok"] and result["daily_ok"] is False:
+            overlay.finish("签到成功，日常失败", ok=False)
+        elif result["ok"]:
+            overlay.finish("签到完成", ok=True)
+        else:
+            overlay.finish("签到失败", ok=False)
         root.after(3500, root.destroy)
 
     def job():
         try:
-            runner = SigninRunner(
+            from .flow import FullFlow
+
+            flow = FullFlow(
                 app_cfg, log,
                 on_progress=lambda index, total, text: progress_queue.put((index, total, text)),
                 mask_provider=lambda: overlay.rect(),
             )
-            result["ok"] = bool(runner.run())
+            result["ok"] = bool(flow.run())
+            result["signin_ok"] = bool(flow.signin_ok)
+            result["daily_ok"] = flow.daily_ok
         except Exception as exc:
-            log(f"签到异常：{exc}")
+            log(f"流程异常：{exc}")
             result["ok"] = False
         finally:
             result["done"] = True

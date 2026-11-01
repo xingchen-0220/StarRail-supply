@@ -10,6 +10,7 @@
 **启动游戏 → 等「点击进入」→ 点击 → 等「点击领取今日补给」→ 点击 → 关闭游戏。**
 
 支持每天定时执行，所有识别与点击都在本机完成。
+签到成功后执行内置日常（邮件、委托、清体力、支援、无名勋礼、每日实训 500），并通过 QQ（OneBot v11）发送签到/日常结果与截图。
 
 ---
 
@@ -33,12 +34,16 @@
 | 功能 | 说明 |
 | --- | --- |
 | 一键领取 | 自动启动游戏，识别并点击「点击进入」和「点击领取今日补给 / 今日奖励」 |
+| 日常任务 | 内置邮件/委托/清体力/支援/无名勋礼/每日实训 500，无需外部程序 |
 | 步骤浮窗 | 屏幕左下角显示 1/7 ~ 7/7 的实时进度，置顶、鼠标穿透、不抢游戏焦点 |
+| QQ 通知 | OneBot v11 私聊，发送签到/日常成功或失败文字，再发送对应截图 |
+| 关键截图 | 签到成功瞬间、未发现签到弹窗、签到失败、日常结束 |
+| 自动更新 | 启动时对比 GitHub Release / version.json，有新版本弹窗提示 |
 | 每日定时 | 程序内定时，或创建 Windows 计划任务（无需保持程序运行） |
 | 互斥保护 | 已创建计划任务时自动关闭程序内定时，避免重复执行 |
 | 路径检测 | 注册表 + 常见安装目录自动检测 `StarRail.exe`，也支持手动选择 |
 | 日志与截图 | 实时日志、失败截图、当前画面 OCR 文字，方便定位问题 |
-| 现代界面 | 左侧导航：首页 / 定时签到 / 运行日志 / 设置 / 关于 |
+| 现代界面 | 左侧导航：首页 / 日常任务 / QQ 通知 / 定时签到 / 运行日志 / 设置 / 关于 |
 | 管理员支持 | 程序以管理员权限运行，解决游戏启动与模拟点击的权限问题 |
 
 ---
@@ -48,6 +53,16 @@
 首页：
 
 ![首页](docs/screenshot.png)
+
+日常任务与 QQ 通知配置：
+
+![日常任务](docs/daily.png)
+
+![QQ 通知](docs/notify.png)
+
+更新提示：
+
+![更新提示](docs/update.png)
 
 关于 / 支持作者：
 
@@ -78,8 +93,11 @@ flowchart TD
     K -- 是 --> L[点击领取]
     K -- 否 --> M[点击屏幕后重试]
     M --> K
-    L --> N[点击屏幕确认]
-    N --> O{由本程序启动?}
+    L --> N[截图 + QQ 通知签到结果]
+    N --> T{签到成功且开启日常?}
+    T -- 是 --> U[内置日常 + QQ 通知日常结果]
+    T -- 否 --> O{由本程序启动?}
+    U --> O
     O -- 是 --> P[关闭游戏]
     O -- 否 --> Q[保持游戏开启]
     P --> R[退出程序]
@@ -108,6 +126,8 @@ flowchart TD
 | 图像处理 | OpenCV + NumPy + Pillow |
 | 键鼠模拟 | Windows SendInput（ctypes / pywin32） |
 | 窗口控制 | Win32 API（EnumWindows、ClientToScreen、SetForegroundWindow） |
+| QQ 通知 | OneBot v11 HTTP（标准库 urllib，无额外依赖） |
+| 更新检查 | GitHub Releases API + raw version.json（标准库 urllib） |
 | 打包 | PyInstaller onefile，内置 OCR 模型与管理员清单 |
 
 不需要联网，OCR 模型随 EXE 一起打包。
@@ -120,8 +140,12 @@ flowchart TD
 starrail-supply/
 ├─ main.py                  入口：GUI / --auto 计划任务模式
 ├─ app/
-│  ├─ gui.py                左侧导航界面、定时与日志
-│  ├─ signin.py             固定签到流程（7 步状态机）
+│  ├─ gui.py                左侧导航界面、定时、日常与 QQ 通知配置
+│  ├─ signin.py             签到流程（含成功/未弹窗/失败截图）
+│  ├─ flow.py               签到 → 通知 → 日常 → 关闭游戏 总流程
+│  ├─ daily_native.py       内置日常（邮件/委托/清体力/支援/实训）
+│  ├─ notifier.py           OneBot v11 QQ 通知
+│  ├─ updater.py            GitHub Release / version.json 版本检查
 │  ├─ vision.py             截图、OCR、模板/文字匹配、点击
 │  ├─ ocr_engine.py         RapidOCR 封装
 │  ├─ winapi.py             Windows 窗口与键鼠注入
@@ -137,6 +161,7 @@ starrail-supply/
 ├─ requirements.txt
 ├─ README.md
 ├─ REPO_INTRO.md            本文件
+├─ version.json             更新检查版本信息
 └─ LICENSE                  GPL-3.0
 ```
 
@@ -175,7 +200,9 @@ python tools\selftest_flow.py
 - 游戏窗口比例 **16:9**，推荐 **1920×1080**；
 - 以**管理员身份**运行（`StarRail.exe` 本身要求管理员，普通权限无法启动，模拟点击也会被 UIPI 拦截）；
 - 游戏账号已登录（启动器记住账号）；
-- 游戏建议使用「窗口化 / 无边框窗口」，独占全屏可能导致截图失败。
+- 游戏建议使用「窗口化 / 无边框窗口」，独占全屏可能导致截图失败；
+- 内置日常覆盖邮件、委托、清体力、支援战斗、支援奖励、无名勋礼、每日实训 500；
+- 如需 QQ 通知：运行 NapCat / go-cqhttp / LLOneBot 等 OneBot v11 HTTP 服务。
 
 ---
 
@@ -195,6 +222,15 @@ python tools\selftest_flow.py
 
 **一直等「点击进入」？**
 游戏还在加载/更新，或账号未登录；查看 `data\logs` 与 `data\screenshots`。
+
+**日常没有执行？**
+请确认游戏在 16:9 / 1920×1080 下运行，并查看日志中的日常步骤。
+
+**QQ 收不到消息？**
+先在「QQ 通知」页点「发送测试消息」；检查 OneBot HTTP 服务、地址、Token 和目标 QQ 号。
+
+**检查更新失败？**
+需要能访问 GitHub；程序会优先读 Release，失败再读 `version.json`。也可以直接打开 Releases 页面手动下载。
 
 **点击没反应 / 截图是黑的？**
 游戏是独占全屏，或程序与游戏权限不一致。改成无边框窗口，并确认程序以管理员运行。

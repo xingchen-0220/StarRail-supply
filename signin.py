@@ -19,6 +19,7 @@ REWARD_TEXTS = [
     "今日奖励",
 ]
 MAIN_TEXTS = ["开拓力", "每日实训", "跃迁", "编队", "三月七"]
+SUCCESS_TEXTS = ["签到成功", "领取成功", "已领取", "领取完成", "今日补给已领取"]
 
 _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 _kernel32.CreateMutexW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR]
@@ -46,7 +47,8 @@ def _release_lock(handle):
 
 
 class SigninRunner:
-    def __init__(self, cfg, log, stop_event=None, on_step=None, on_progress=None, mask_provider=None):
+    def __init__(self, cfg, log, stop_event=None, on_step=None, on_progress=None,
+                 mask_provider=None, defer_close=False):
         self.cfg = cfg
         self.log = log
         self.stop_event = stop_event
@@ -55,6 +57,11 @@ class SigninRunner:
         self.mask_provider = mask_provider
         self.auto = None
         self.skipped = False
+        self.defer_close = defer_close
+        self.shots = {}
+        self.was_running = False
+        self.game_closed = False
+        self.last_message = ""
 
     # ------------------------------------------------------------ 基础 --
     def stopped(self):
@@ -121,20 +128,29 @@ class SigninRunner:
         winapi.click(left + width // 2, top + height // 2)
         self._sleep(0.8)
 
-    def _save_failure_shot(self):
+    def capture(self, kind):
+        """把当前游戏画面保存为指定类型的截图。"""
+        if self.auto is None:
+            return None
         try:
             SHOT_DIR.mkdir(parents=True, exist_ok=True)
-            path = SHOT_DIR / f"fail_{time.strftime('%Y%m%d_%H%M%S')}.png"
+            path = SHOT_DIR / f"{kind}_{time.strftime('%Y%m%d_%H%M%S')}.png"
             self.auto.screenshot_to_file(str(path))
-            self.log(f"已保存失败截图：{path}")
-            try:
-                lines = self.auto.ocr_lines()
-                if lines:
-                    self.log("当前画面识别到的文字：")
-                    for x, y, text, score in lines[:20]:
-                        self.log(f"  ({x}, {y}) {text} [{score:.2f}]")
-            except Exception:
-                pass
+            self.shots[kind] = str(path)
+            self.log(f"已保存截图：{path}")
+            return str(path)
+        except Exception as exc:
+            self.log(f"保存截图失败：{exc}")
+            return None
+
+    def _save_failure_shot(self):
+        self.capture("failure")
+        try:
+            lines = self.auto.ocr_lines()
+            if lines:
+                self.log("当前画面识别到的文字：")
+                for x, y, text, score in lines[:20]:
+                    self.log(f"  ({x}, {y}) {text} [{score:.2f}]")
         except Exception:
             pass
 
@@ -153,12 +169,14 @@ class SigninRunner:
     def _run(self):
         self.stage(1, 7, "启动游戏")
         was_running = bool(launcher.game_window(self.cfg))
+        self.was_running = was_running
         if was_running:
             self.step("游戏已在运行，直接使用当前窗口")
             hwnd = launcher.game_window(self.cfg)
         else:
             path = self.cfg.get("game_path", "") or launcher.detect_game_path(self.cfg)
             if not path or not os.path.isfile(path):
+                self.last_message = "未找到游戏路径"
                 self.log("未找到游戏路径，请在主界面选择 StarRail.exe")
                 return False
             self.cfg.set("game_path", path)
@@ -189,6 +207,7 @@ class SigninRunner:
             elif was_running:
                 title = self._wait_text(TITLE_TEXTS, float(self.cfg.get("title_timeout", 120)))
             if not title and not self._exists(MAIN_TEXTS):
+                self.last_message = "等待「点击进入」超时"
                 self.step("签到失败：等待「点击进入」超时")
                 self._save_failure_shot()
                 return False
@@ -216,6 +235,8 @@ class SigninRunner:
             reward = self._wait_text(REWARD_TEXTS, float(self.cfg.get("reward_timeout", 60)) * 0.5)
         if not reward:
             self.step("签到失败：等待「点击领取今日奖励」超时")
+            self.last_message = "未发现签到弹窗（可能今日已领取，或未开通列车补给/月卡）"
+            self.capture("no_popup")
             self._save_failure_shot()
             return False
 
@@ -223,6 +244,15 @@ class SigninRunner:
         self._click(reward, "领取今日奖励")
         if self.stopped():
             return False
+
+        # 等待「领取成功」出现的那一瞬间截图
+        success = self._wait_text(SUCCESS_TEXTS, 5.0, include=True, interval=0.5)
+        self.capture("success")
+        if success:
+            self.log(f"出现领取成功提示：「{success['text']}」")
+        else:
+            self.log("未识别到「领取成功」文字，已按当前画面保存截图")
+
         self.step(f"等待 {float(self.cfg.get('after_click_wait', 2.5)):.1f} 秒领取…")
         if not self._sleep(float(self.cfg.get("after_click_wait", 2.5))):
             return False
@@ -233,15 +263,32 @@ class SigninRunner:
         if not self._sleep(2.0):
             return False
 
-        if self.cfg.get("exit_game", True) and not was_running:
+        if self.defer_close:
+            self.stage(7, 7, "签到完成（等待日常）")
+            self.step("签到完成，保留游戏窗口等待日常任务")
+        elif self.cfg.get("exit_game", True) and not was_running:
             self.stage(7, 7, "关闭游戏")
             self._close_game()
         else:
             self.stage(7, 7, "签到完成")
             if self.cfg.get("exit_game", True):
                 self.log("游戏原本已在运行，签到后保持游戏开启")
+        self.last_message = "已领取今日列车补给"
         self.step("签到完成")
         return True
+
+    def close_game(self):
+        """签到/日常流程结束后，按配置关闭游戏（仅当游戏由本次流程启动）。"""
+        if self.game_closed:
+            return
+        if self.was_running:
+            self.log("游戏原本已在运行，保持开启")
+            return
+        if not self.cfg.get("exit_game", True):
+            return
+        self.stage(7, 7, "关闭游戏")
+        self._close_game()
+        self.game_closed = True
 
     def _close_game(self):
         process = self.cfg.get("game_process", "StarRail.exe")

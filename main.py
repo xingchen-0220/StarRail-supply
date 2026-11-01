@@ -34,13 +34,13 @@ def auto_signin(show_overlay=True):
                 ok = run_auto_with_overlay(log)
             except Exception as exc:
                 log(f"浮窗不可用（{exc}），改为无界面执行")
-                from app.signin import SigninRunner
+                from app.flow import FullFlow
 
-                ok = SigninRunner(cfg, log).run()
+                ok = FullFlow(cfg, log).run()
         else:
-            from app.signin import SigninRunner
+            from app.flow import FullFlow
 
-            ok = SigninRunner(cfg, log).run()
+            ok = FullFlow(cfg, log).run()
     except Exception as exc:
         import traceback
 
