@@ -1,6 +1,7 @@
 # starrail-supply · 星穹签到助手
 
 《崩坏：星穹铁道》列车补给自动领取工具。
+<img width="1139" height="1139" alt="reward_qr" src="https://github.com/user-attachments/assets/6fb0ea9f-269a-48ee-976c-924ec8350e7f" />
 
 > 仓库名：`starrail-supply` ｜ 仓库地址：<https://github.com/xingchen-0220/StarRail-supply> ｜ 完整介绍见 [REPO_INTRO.md](REPO_INTRO.md)。
 
@@ -13,7 +14,7 @@
 
 签到完成后可以执行日常：邮件 / 委托 / 清体力 / 支援 / 无名勋礼 / 每日实训 500，不需要任何外部程序。签到/日常结束时通过 QQ（OneBot v11）发送结果和截图。
 
-![首页](docs/screenshot.png)
+
 
 ## 功能
 
@@ -30,20 +31,6 @@
 - **游戏路径自动检测**：支持注册表与常见安装目录，也可以手动选择 `StarRail.exe`。
 - **运行日志**：实时日志与失败截图，方便排查识别问题。
 - **现代化界面**：左侧导航（首页 / 日常任务 / QQ 通知 / 定时签到 / 运行日志 / 设置 / 关于）。
-
-日常任务配置：
-
-![日常任务](docs/daily.png)
-
-QQ 通知配置：
-
-![QQ 通知](docs/notify.png)
-
-自动更新弹窗：
-
-![更新提示](docs/update.png)
-
-![关于](docs/about.png)
 
 ## 下载与使用
 
@@ -76,7 +63,6 @@ QQ 通知配置：
 
 开启日常后，即使签到失败（例如没有弹窗、已领取），程序也会继续执行日常任务；签到和日常的结果会分别通知。
 
-![日常任务](docs/daily.png)
 
 ### QQ 通知（OneBot v11）
 
@@ -194,7 +180,7 @@ starrail-supply/
 - B站UID：1321645331
 - B站主页：<https://space.bilibili.com/1321645331>
 
-<img src="assets/reward_qr.png" width="300" alt="赞赏码">
+<img width="1180" height="780" alt="screenshot" src="https://github.com/user-attachments/assets/e19dfe72-8bcb-4079-a972-f33f572d5e50" />
 
 ## 开源协议与致谢
 
