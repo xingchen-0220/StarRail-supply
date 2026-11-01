@@ -1,7 +1,7 @@
 # starrail-supply · 星穹签到助手
 
 《崩坏：星穹铁道》列车补给自动领取工具。
-<img width="1139" height="1139" alt="reward_qr" src="https://github.com/user-attachments/assets/6fb0ea9f-269a-48ee-976c-924ec8350e7f" />
+<img width="1180" height="780" alt="screenshot" src="https://github.com/user-attachments/assets/e19dfe72-8bcb-4079-a972-f33f572d5e50" />
 
 > 仓库名：`starrail-supply` ｜ 仓库地址：<https://github.com/xingchen-0220/StarRail-supply> ｜ 完整介绍见 [REPO_INTRO.md](REPO_INTRO.md)。
 
@@ -180,8 +180,7 @@ starrail-supply/
 - B站UID：1321645331
 - B站主页：<https://space.bilibili.com/1321645331>
 
-<img width="1180" height="780" alt="screenshot" src="https://github.com/user-attachments/assets/e19dfe72-8bcb-4079-a972-f33f572d5e50" />
-
+<img width="1139" height="1139" alt="reward_qr" src="https://github.com/user-attachments/assets/6fb0ea9f-269a-48ee-976c-924ec8350e7f" />
 ## 开源协议与致谢
 
 本项目的流程思路、图像识别与游戏启动方式参考自
